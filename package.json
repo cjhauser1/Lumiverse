@@ -48,7 +48,9 @@
     "backfill-character-world-book-ownership": "bun run scripts/backfill-character-world-book-ownership.ts",
     "migrate:st": "bun run scripts/migrate-sillytavern.ts",
     "release": "bash scripts/release.sh",
-    "backfill-thumbnails": "bun run scripts/backfill-thumbnails.ts"
+    "backfill-thumbnails": "bun run scripts/backfill-thumbnails.ts",
+    "android:bundle-bun": "bun run scripts/android/prepare-bun-sidecar.ts",
+    "android:runtime-plan": "cat experiments/android-bun-runtime/README.md"
   },
   "type": "module"
 }
