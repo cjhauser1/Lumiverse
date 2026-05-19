@@ -8,6 +8,24 @@ export type AndroidBunRuntimeConfig = {
   workingDir: string;
   backendEntry: string;
   port: number;
+  smokeTimeoutMs?: number;
+};
+
+export type AndroidRuntimeDiagnosticCode =
+  | "OK"
+  | "TIMEOUT"
+  | "EXEC_PERMISSION"
+  | "LINKER_OR_SHARED_LIB"
+  | "SPAWN_ERROR"
+  | "NON_ZERO_EXIT";
+
+export type AndroidRuntimeDiagnostic = {
+  ok: boolean;
+  code: AndroidRuntimeDiagnosticCode;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  detail: string;
 };
 
 export function isAndroidAppRuntime(): boolean {
@@ -28,22 +46,43 @@ export function prepareAndroidBunBinary(config: AndroidBunRuntimeConfig): void {
   }
 }
 
-export async function smokeTestAndroidBun(config: AndroidBunRuntimeConfig): Promise<string> {
-  return await new Promise((resolve, reject) => {
+function classifyFailure(stderr: string): AndroidRuntimeDiagnosticCode {
+  const lower = stderr.toLowerCase();
+  if (lower.includes("permission denied") || lower.includes("operation not permitted")) return "EXEC_PERMISSION";
+  if (lower.includes("linker") || lower.includes("shared library") || lower.includes("not found")) return "LINKER_OR_SHARED_LIB";
+  return "NON_ZERO_EXIT";
+}
+
+export async function smokeTestAndroidBun(config: AndroidBunRuntimeConfig): Promise<AndroidRuntimeDiagnostic> {
+  return await new Promise((resolve) => {
     const child = spawn(config.runtimeBunPath, ["--version"], {
       cwd: config.workingDir,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    let out = "";
-    let err = "";
-    child.stdout.on("data", (d) => (out += String(d)));
-    child.stderr.on("data", (d) => (err += String(d)));
+    let stdout = "";
+    let stderr = "";
+    const timeoutMs = config.smokeTimeoutMs ?? 10_000;
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve({ ok: false, code: "TIMEOUT", exitCode: null, stdout: stdout.trim(), stderr: stderr.trim(), detail: `Smoke test timed out after ${timeoutMs}ms` });
+    }, timeoutMs);
 
-    child.on("error", reject);
+    child.stdout.on("data", (d) => (stdout += String(d)));
+    child.stderr.on("data", (d) => (stderr += String(d)));
+
+    child.on("error", (err: Error) => {
+      clearTimeout(timeout);
+      resolve({ ok: false, code: "SPAWN_ERROR", exitCode: null, stdout: stdout.trim(), stderr: stderr.trim(), detail: err.message });
+    });
+
     child.on("close", (code) => {
-      if (code === 0) return resolve(out.trim());
-      reject(new Error(`Bun smoke test failed (code=${code}): ${err || out}`));
+      clearTimeout(timeout);
+      if (code === 0) {
+        resolve({ ok: true, code: "OK", exitCode: code, stdout: stdout.trim(), stderr: stderr.trim(), detail: "bun --version completed" });
+        return;
+      }
+      resolve({ ok: false, code: classifyFailure(stderr), exitCode: code, stdout: stdout.trim(), stderr: stderr.trim(), detail: "bun --version failed" });
     });
   });
 }
