@@ -96,3 +96,22 @@ Tradeoffs:
 
 - Robust Android-ABI validation of `.node` payloads currently relies on filename heuristics and should be upgraded to ELF-level ABI checks in a follow-up.
 - Actual on-device runtime validation still requires emulator/device runs from `apps/android-shell` host app wiring.
+
+## Emulator smoke test automation (host-side)
+
+A host-side script was added to automate Android emulator provisioning and boot checks:
+
+- `bun run android:emulator-smoke`
+- Script: `scripts/android/emulator-smoke.sh`
+
+What it does:
+
+1. Validates Android SDK toolchain paths (`sdkmanager`, `avdmanager`, `emulator`, `adb`).
+2. Installs emulator + platform tools + API 34 arm64 system image.
+3. Creates AVD `lumiverse-api34-arm64` (configurable via env vars).
+4. Boots emulator in headless mode (`-no-window`, `-accel off`).
+5. Waits for `sys.boot_completed=1` as readiness gate.
+
+Current limitation in this repo snapshot:
+
+- APK install/launch wiring is left as TODO in script output because this checkout still lacks finalized Android app module task wiring for deterministic CLI install/launch in CI-like hosts.
