@@ -69,3 +69,15 @@ scripts/push-staging.sh
 src/macros/macros.test.ts
 vendor/
 scripts/build-lancedb-android.sh
+
+
+# Android prototype generated artifacts
+apps/android-shell/android-assets/backend/
+apps/android-shell/android/app/build/
+apps/android-shell/android/.gradle/
+apps/android-shell/src-tauri/target/
+.tmp/android-backend-bundle/
+*.apk
+*.aab
+
+apps/android-shell/android-assets/diagnostics/
