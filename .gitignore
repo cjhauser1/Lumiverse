@@ -79,3 +79,5 @@ apps/android-shell/src-tauri/target/
 .tmp/android-backend-bundle/
 *.apk
 *.aab
+
+apps/android-shell/android-assets/diagnostics/

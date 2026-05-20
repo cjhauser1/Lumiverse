@@ -69,3 +69,66 @@ Tradeoffs:
 
 - Pros: More predictable Android runtime behavior, fewer linker constraints.
 - Cons: Additional Rust host complexity and reduced parity with desktop Bun runtime behavior.
+
+## Phase 6/7/8 iteration notes
+
+### Runtime hardening updates
+
+- `android-bun-runtime.ts` now supports startup timeout enforcement, backend healthcheck polling, async process-exit capture, and JSONL runtime log persistence in app-private storage.
+- Failure classification now differentiates extraction/chmod issues, ELF/ABI mismatch signals, SELinux denial signatures, linker/shared-lib failures, process crashes, and potential port bind failures.
+
+### Bun compatibility tooling
+
+- New script: `bun run android:inspect-bun-binary [path-to-bun]`
+- Produces `apps/android-shell/android-assets/diagnostics/bun-compatibility-report.json` containing:
+  - `file` metadata output
+  - `readelf` ELF header / interpreter / dynamic section output
+  - `ldd` dependency output
+  - inferred compatibility hints (arch, dynamic/static tendency, glibc/musl hints, Android linker hints)
+
+### APK footprint reduction (current pass)
+
+- Backend bundling now filters staged native `.node` binaries to Android/arm64-labeled entries only.
+- Linux desktop / Darwin / Windows / x64-oriented native binaries are excluded from staged Android assets.
+- Bundling emits `size-report.json` with included/excluded native counts and examples.
+
+### Current blockers / assumptions
+
+- Robust Android-ABI validation of `.node` payloads currently relies on filename heuristics and should be upgraded to ELF-level ABI checks in a follow-up.
+- Actual on-device runtime validation still requires emulator/device runs from `apps/android-shell` host app wiring.
+
+## Emulator smoke test automation (host-side)
+
+A host-side script was added to automate Android emulator provisioning and boot checks:
+
+- `bun run android:emulator-smoke`
+- Script: `scripts/android/emulator-smoke.sh`
+
+What it does:
+
+1. Validates Android SDK toolchain paths (`sdkmanager`, `avdmanager`, `emulator`, `adb`).
+2. Installs emulator + platform tools + API 34 arm64 system image.
+3. Creates AVD `lumiverse-api34-arm64` (configurable via env vars).
+4. Boots emulator in headless mode (`-no-window`, `-accel off`).
+5. Waits for `sys.boot_completed=1` as readiness gate.
+
+Current limitation in this repo snapshot:
+
+- APK install/launch wiring is left as TODO in script output because this checkout still lacks finalized Android app module task wiring for deterministic CLI install/launch in CI-like hosts.
+
+## 2026-05-20 container validation update
+
+Executed in Ubuntu 24.04 container with internet access:
+
+1. Installed Android cmdline tools under `/opt/android-sdk`.
+2. Installed emulator host runtime libs (`libx11-xcb1`, `libxcb*`, `libgbm1`, `mesa-libgallium`, etc.) to resolve previous `libX11-xcb.so.1` startup failure.
+3. Re-ran `android:emulator-smoke` with `ANDROID_SDK_ROOT=/opt/android-sdk`.
+
+Result:
+
+- Emulator process now launches past the previous shared-library error.
+- In this container it remains unstable / non-deterministic for full boot (device frequently `offline` without hardware acceleration), preventing reliable APK install/launch verification in this environment.
+
+Actionable next environment requirement:
+
+- run emulator smoke on a runner/host with KVM acceleration enabled for deterministic `sys.boot_completed` and adb-online transition.

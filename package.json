@@ -51,7 +51,9 @@
     "backfill-thumbnails": "bun run scripts/backfill-thumbnails.ts",
     "android:bundle-bun": "bun run scripts/android/prepare-bun-sidecar.ts",
     "android:runtime-plan": "cat experiments/android-bun-runtime/README.md",
-    "android:build-backend-bundle": "bun run scripts/android/build-backend-bundle.ts"
+    "android:build-backend-bundle": "bun run scripts/android/build-backend-bundle.ts",
+    "android:inspect-bun-binary": "bun run scripts/android/inspect-bun-binary.ts",
+    "android:emulator-smoke": "bash scripts/android/emulator-smoke.sh"
   },
   "type": "module"
 }
