@@ -69,3 +69,30 @@ Tradeoffs:
 
 - Pros: More predictable Android runtime behavior, fewer linker constraints.
 - Cons: Additional Rust host complexity and reduced parity with desktop Bun runtime behavior.
+
+## Phase 6/7/8 iteration notes
+
+### Runtime hardening updates
+
+- `android-bun-runtime.ts` now supports startup timeout enforcement, backend healthcheck polling, async process-exit capture, and JSONL runtime log persistence in app-private storage.
+- Failure classification now differentiates extraction/chmod issues, ELF/ABI mismatch signals, SELinux denial signatures, linker/shared-lib failures, process crashes, and potential port bind failures.
+
+### Bun compatibility tooling
+
+- New script: `bun run android:inspect-bun-binary [path-to-bun]`
+- Produces `apps/android-shell/android-assets/diagnostics/bun-compatibility-report.json` containing:
+  - `file` metadata output
+  - `readelf` ELF header / interpreter / dynamic section output
+  - `ldd` dependency output
+  - inferred compatibility hints (arch, dynamic/static tendency, glibc/musl hints, Android linker hints)
+
+### APK footprint reduction (current pass)
+
+- Backend bundling now filters staged native `.node` binaries to Android/arm64-labeled entries only.
+- Linux desktop / Darwin / Windows / x64-oriented native binaries are excluded from staged Android assets.
+- Bundling emits `size-report.json` with included/excluded native counts and examples.
+
+### Current blockers / assumptions
+
+- Robust Android-ABI validation of `.node` payloads currently relies on filename heuristics and should be upgraded to ELF-level ABI checks in a follow-up.
+- Actual on-device runtime validation still requires emulator/device runs from `apps/android-shell` host app wiring.
