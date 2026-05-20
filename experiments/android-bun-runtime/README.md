@@ -115,3 +115,20 @@ What it does:
 Current limitation in this repo snapshot:
 
 - APK install/launch wiring is left as TODO in script output because this checkout still lacks finalized Android app module task wiring for deterministic CLI install/launch in CI-like hosts.
+
+## 2026-05-20 container validation update
+
+Executed in Ubuntu 24.04 container with internet access:
+
+1. Installed Android cmdline tools under `/opt/android-sdk`.
+2. Installed emulator host runtime libs (`libx11-xcb1`, `libxcb*`, `libgbm1`, `mesa-libgallium`, etc.) to resolve previous `libX11-xcb.so.1` startup failure.
+3. Re-ran `android:emulator-smoke` with `ANDROID_SDK_ROOT=/opt/android-sdk`.
+
+Result:
+
+- Emulator process now launches past the previous shared-library error.
+- In this container it remains unstable / non-deterministic for full boot (device frequently `offline` without hardware acceleration), preventing reliable APK install/launch verification in this environment.
+
+Actionable next environment requirement:
+
+- run emulator smoke on a runner/host with KVM acceleration enabled for deterministic `sys.boot_completed` and adb-online transition.

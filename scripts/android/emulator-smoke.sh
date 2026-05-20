@@ -39,19 +39,40 @@ if ! "$AVDMANAGER" list avd | grep -q "Name: ${AVD_NAME}"; then
   echo "no" | "$AVDMANAGER" create avd -n "$AVD_NAME" -k "$PKG_SYSIMG" -d "$DEVICE"
 fi
 
-"$EMULATOR_BIN" -avd "$AVD_NAME" -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -accel off >/tmp/lumiverse-emulator.log 2>&1 &
+
+pkill -f "/opt/android-sdk/emulator/emulator -avd ${AVD_NAME}" >/dev/null 2>&1 || true
+
+# Ensure stale emulator for same AVD is not running
+if "$ADB_BIN" devices | awk "NR>1 {print \$1}" | grep -q "^emulator-"; then
+  while read -r serial; do
+    [[ -n "$serial" ]] || continue
+    avd=$($ADB_BIN -s "$serial" emu avd name 2>/dev/null | tr -d "\r" || true)
+    if [[ "$avd" == "$AVD_NAME" ]]; then
+      $ADB_BIN -s "$serial" emu kill >/dev/null 2>&1 || true
+    fi
+  done < <("$ADB_BIN" devices | awk 'NR>1 {print $1}')
+  sleep 2
+fi
+
+"$EMULATOR_BIN" -avd "$AVD_NAME" -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -accel off -no-metrics >/tmp/lumiverse-emulator.log 2>&1 &
 EMU_PID=$!
 trap 'kill ${EMU_PID} >/dev/null 2>&1 || true' EXIT
 
 "$ADB_BIN" wait-for-device
-for _ in $(seq 1 180); do
+BOOT_TIMEOUT_SECS="${BOOT_TIMEOUT_SECS:-900}"
+DEADLINE=$(( $(date +%s) + BOOT_TIMEOUT_SECS ))
+while [[ $(date +%s) -lt $DEADLINE ]]; do
   if "$ADB_BIN" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' | grep -q "1"; then
     echo "Emulator booted: ${AVD_NAME}"
     echo "TODO: wire APK install + launch when android-shell app module is finalized"
     exit 0
   fi
+  if ! kill -0 "$EMU_PID" 2>/dev/null; then
+    echo "emulator process exited early; inspect /tmp/lumiverse-emulator.log" >&2
+    exit 1
+  fi
   sleep 2
 done
 
-echo "emulator failed to report boot_completed within timeout" >&2
+echo "emulator failed to report boot_completed within ${BOOT_TIMEOUT_SECS}s" >&2
 exit 1
